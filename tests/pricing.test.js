@@ -31,7 +31,8 @@ test("digital pricing selects only the exact digital release, separating zero an
 });
 test("background price requests are cached and serialized separately from collection requests", async () => {
   const dom = environment();
-  let listener, active = 0, maxActive = 0, calls = 0;
+  let listener, active = 0, maxActive = 0, calls = 0, now = 100000000;
+  dom.window.Date.now = () => now;
   dom.window.fetch = async () => {
     calls++; active++; maxActive = Math.max(maxActive, active);
     await new Promise(resolve => setTimeout(resolve, 5));
@@ -50,6 +51,9 @@ test("background price requests are cached and serialized separately from collec
   assert.equal(calls, 2);
   await listener({ ...message("one"), force: true }, {});
   assert.equal(calls, 3);
+  now += 10 * 60 * 1000;
+  await listener(message("one"), {});
+  assert.equal(calls, 4);
   dom.window.close();
 });
 function gridHTML() {

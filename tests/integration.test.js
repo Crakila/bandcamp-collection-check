@@ -36,7 +36,8 @@ test("discography offer uses Bandcamp's discounted starting price and bundle pur
 });
 test("discography lookup refreshes its price and does not offer a different seller's bundle", async () => {
   const dom = environment();
-  let listener, calls = 0, price = 1;
+  let listener, calls = 0, price = 1, now = 100000000;
+  dom.window.Date.now = () => now;
   dom.window.fetch = async () => { calls++; return { ok: true, text: async () => discographyHTML({ price }) }; };
   dom.window.browser = { runtime: { onMessage: { addListener: fn => { listener = fn; } } }, browserAction: { setBadgeBackgroundColor() {} } };
   dom.window.browser.storage = { local: { get: async () => ({}) } };
@@ -49,6 +50,13 @@ test("discography lookup refreshes its price and does not offer a different sell
   assert.equal(calls, 1);
   assert.equal((await listener({ ...message, force: true }, {})).offer.price, 5);
   assert.equal((await listener({ ...message, bandId: 10 }, {})).offer, null);
+  const before = calls;
+  await listener({ ...message, bandId: 10 }, {});
+  assert.equal(calls, before); // Missing offers are also cached.
+  now += 10 * 60 * 1000;
+  price = 8;
+  assert.equal((await listener(message, {})).offer.price, 8);
+  assert.equal(calls, before + 1);
   dom.window.close();
 });
 test("collection parser selects collection sequence, excluding wishlist data", () => {
@@ -133,7 +141,15 @@ test("music grid filters load lazy artwork, highlight ownership and show the dis
   const choose = name => [...window.document.querySelectorAll(".bcc-filters button")].find(b => b.textContent.startsWith(name)).click();
   // Simulate a lazy loader that left a placeholder after the collection arrived.
   review.querySelector("img").src = "/img/0.gif";
+  const reviewBadge = review.querySelector(".bcc-status");
+  const reviewDetails = reviewBadge.querySelector("details");
+  const reviewControl = reviewBadge.querySelector("button");
+  reviewDetails.open = true;
+  reviewControl.focus();
   choose("Review");
+  assert.equal(review.querySelector(".bcc-status"), reviewBadge);
+  assert.equal(reviewDetails.open, true);
+  assert.equal(window.document.activeElement, reviewControl);
   assert.equal(review.querySelector("img").src, "https://f4.bcbits.com/img/a2_2.jpg");
   assert.equal(review.querySelector("img").loading, "eager");
   assert.equal(window.getComputedStyle(review.querySelector("img")).display, "block");
@@ -152,6 +168,7 @@ test("music grid filters load lazy artwork, highlight ownership and show the dis
   await new Promise(resolve => setTimeout(resolve, 180));
   assert.equal(window.document.querySelectorAll(".bcc-status").length, 4);
   assert.equal(window.document.querySelectorAll(".bcc-panel").length, 1);
+  assert.equal(review.querySelector("details").open, true);
   assert.equal(window.document.querySelector('[data-item-id="album-4"] img').src, "https://f4.bcbits.com/img/a4_2.jpg");
   [...window.document.querySelectorAll(".bcc-status button")].find(b => b.textContent === "Undo decision").click();
   await new Promise(resolve => setTimeout(resolve, 10));
@@ -166,5 +183,66 @@ test("music page does not show a purchase button when no discography offer is av
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(dom.window.document.querySelector(".bcc-discography").hidden, true);
   assert.equal(dom.window.document.querySelector(".bcc-discography-buy"), null);
+  dom.window.close();
+});
+
+test("filtering drops expired ownership observations and reacts to replacement snapshots", async () => {
+  const dom = environment(`<script data-band='{"name":"Artist"}'></script><ol id="music-grid"><li class="music-grid-item" data-item-id="album-1"><a href="/album/owned"><p class="title">Owned</p></a></li></ol>`);
+  const { window } = dom;
+  let now = 100000000, notify;
+  window.Date.now = () => now;
+  const release = window.BCCore.item(rawItem);
+  const snapshot = { complete: true, updatedAt: now, items: [] };
+  window.browser = { storage: { onChanged: { addListener: listener => { notify = listener; } } }, runtime: {
+    onMessage: { addListener() {} }, sendMessage: async message => message.type === "state" ? {
+      user: { fanId: "7", username: "tester" }, snapshot, decisions: {},
+      ownership: { purchase: { ...release, status: "owned", updatedAt: now - 6 * 60 * 60 * 1000 + 100 } }
+    } : {}
+  } };
+  window.eval(source("content.js"));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(window.document.querySelectorAll(".bcc-owned").length, 1);
+  now += 100;
+  [...window.document.querySelectorAll(".bcc-filters button")].find(button => button.textContent.startsWith("Missing")).click();
+  assert.equal(window.document.querySelectorAll(".bcc-missing").length, 1);
+  assert.equal(window.document.querySelector("li").classList.contains("bcc-hidden"), false);
+  notify({ "collection:7": { newValue: { ...snapshot, items: [release] } } }, "local");
+  assert.equal(window.document.querySelectorAll(".bcc-owned").length, 1);
+  assert.equal(window.document.querySelector("li").classList.contains("bcc-hidden"), true);
+  dom.window.close();
+});
+
+test("fast artist lookups render together", async () => {
+  const cards = [1, 2, 3].map(id => `<li class="music-grid-item" data-item-id="album-${id}"><a href="/album/release-${id}"><p class="title">Release ${id}</p></a></li>`).join("");
+  const dom = environment(`<script data-band='{"name":"Label","is_label":true,"meets_buy_full_discography_criteria":false}'></script><ol id="music-grid">${cards}</ol>`);
+  const { window } = dom;
+  window.Date.now = () => 100000000;
+  const snapshot = { complete: true, updatedAt: window.Date.now(), items: [1, 2, 3].map(id => ({
+    type: "album", id: String(id + 10), url: `https://label.bandcamp.com/album/release-${id}`, artist: "Artist", title: `Release ${id}`
+  })) };
+  let matches = 0, beforeLookups, requests = 0;
+  const createMatcher = window.BCCore.createMatcher;
+  window.BCCore.createMatcher = (...args) => {
+    const matcher = createMatcher(...args);
+    const match = matcher.match;
+    matcher.match = release => { matches++; return match(release); };
+    return matcher;
+  };
+  window.browser = { storage: { onChanged: { addListener() {} } }, runtime: {
+    onMessage: { addListener() {} }, sendMessage: async message => {
+      if (message.type === "state") return { user: { fanId: "7", username: "tester" }, snapshot, decisions: {} };
+      if (message.type === "metadata") {
+        if (!requests) beforeLookups = matches;
+        requests++;
+        return { artist: "Artist" };
+      }
+      return {};
+    }
+  } };
+  window.eval(source("content.js"));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(requests, 3);
+  assert.equal(matches - beforeLookups, 3); // One grid render for all three lookup results.
+  assert.equal(window.document.querySelectorAll(".bcc-probable").length, 3);
   dom.window.close();
 });

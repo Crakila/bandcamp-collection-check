@@ -61,3 +61,54 @@ test("pagination uses opaque cursors and rejects interrupted or stalled retrieva
   await assert.rejects(core.paginate({ count: null, fetchPage: async () => ({}) }), /reliable/);
   await assert.rejects(core.paginate({ count: 2, initial: [1], cursor: "next", fetchPage: async () => ({ items: [1], last_token: "new" }) }), /repeated/);
 });
+
+test("indexed matching preserves collection order, typed IDs and review precedence", () => {
+  const byUrl = { ...own, id: "10", url: other.url };
+  const byId = { ...other, url: "https://artist.bandcamp.com/album/second" };
+  const snapshot = { complete: true, items: [byUrl, byId, own] };
+  const matcher = core.createMatcher(snapshot);
+  assert.deepEqual(matcher.match(other).candidates, [byUrl]);
+  assert.deepEqual(core.createMatcher({ ...snapshot, items: [byId, byUrl] }).match(other).candidates, [byId]);
+  assert.equal(matcher.match({ ...other, type: "track", url: "https://artist.bandcamp.com/track/goodbye" }).status, "missing");
+
+  const copy = { ...own, id: "11", url: "https://label.bandcamp.com/album/another-copy" };
+  const copies = { complete: true, items: [own, copy] };
+  const decisions = { [core.pair(other, copy)]: "same", [core.pair(other, own)]: "same", malformed: "same" };
+  const reviewed = core.createMatcher(copies, decisions);
+  assert.deepEqual(reviewed.match(other).candidates, [own]);
+  assert.deepEqual(reviewed.reviewed(other), [own, copy]);
+  assert.equal(reviewed.needsMetadata({ ...other, artist: "", title: " Goodbye  Future Funk " }), true);
+  assert.equal(reviewed.needsMetadata({ ...other, type: "track", artist: "" }), false);
+  assert.equal(core.createMatcher({ complete: true, items: [] }, decisions).match(other).status, "missing");
+});
+
+test("indexed ownership gives purchases precedence and exposes the next expiry", () => {
+  const now = 100000000;
+  const ttl = 6 * 60 * 60 * 1000;
+  const ownership = {
+    unavailable: { ...other, status: "unavailable", updatedAt: now },
+    purchased: { ...other, url: "https://artist.bandcamp.com/album/verified-copy", status: "owned", updatedAt: now - ttl + 1 },
+    expired: { ...other, status: "owned", updatedAt: now - ttl },
+    future: { ...own, status: "owned", updatedAt: now + 100 }
+  };
+  const matcher = core.createMatcher(null, {}, ownership, now);
+  assert.equal(matcher.match(other).reason, "page");
+  assert.equal(matcher.expiresAt, now + 1);
+  assert.equal(core.createMatcher(null, {}, ownership, now + 1).match(other).status, "unavailable");
+  assert.equal(core.createMatcher(null, {}, ownership, now + 1).expiresAt, now + 100);
+  assert.equal(core.createMatcher(null, {}, ownership, now + 100).match(own).reason, "page");
+  assert.equal(core.createMatcher(null, {}, ownership, now + ttl + 100).match(other).status, "unchecked");
+});
+
+test("pagination reports unique progress and retains updated overlapping items", async () => {
+  const progress = [];
+  const items = await core.paginate({
+    initial: [{ id: 1, title: "old" }], count: 3, cursor: "first", getKey: item => item.id,
+    progress: (loaded, total) => progress.push([loaded, total]),
+    fetchPage: async cursor => cursor === "first" ? {
+      items: [{ id: 1, title: "updated" }, { id: 2 }], last_token: "second"
+    } : { items: [{ id: 2 }, { id: 3 }], last_token: null }
+  });
+  assert.deepEqual(items, [{ id: 1, title: "updated" }, { id: 2 }, { id: 3 }]);
+  assert.deepEqual(progress, [[1, 3], [2, 3], [3, 3]]);
+});

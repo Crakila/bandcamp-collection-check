@@ -16,6 +16,9 @@
   const band = BCPage.jsonAttribute(document, "[data-band]", "data-band") || {};
   let state = { snapshot: null, decisions: {}, error: "" };
   let filter = "all", busy = false, timer, resolving = false;
+  let matcherCache;
+  let renderedEntries = [];
+  const renderedCards = new WeakMap();
   const metadata = new Map();
   const failedMetadata = new Set();
   const ownershipChecks = new Map();
@@ -31,7 +34,7 @@
   const filters = el("div", "bcc-filters");
   const buttons = {};
   for (const [name, label] of [["all", "All"], ["missing", "Missing"], ["probable", "Review"], ["owned", "Owned"], ["unavailable", "Unavailable"], ["unchecked", "Unchecked"]]) {
-    buttons[name] = button(label, () => { filter = name; render(); });
+    buttons[name] = button(label, () => { filter = name; applyFilter(); });
     filters.append(buttons[name]);
   }
   const refreshButton = button("Refresh collection", () => Promise.all([refresh(true), checkDiscography(true)]));
@@ -101,7 +104,27 @@
       image.classList.add("bcc-art-loaded");
     }
   }
-  const money = (price, currency) => new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "code" }).format(price);
+  const moneyFormats = new Map();
+  function money(price, currency) {
+    if (!moneyFormats.has(currency)) moneyFormats.set(currency, new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "code" }));
+    return moneyFormats.get(currency).format(price);
+  }
+  function collectionMatcher() {
+    const { snapshot, decisions, ownership } = state;
+    if (!matcherCache || matcherCache.snapshot !== snapshot || matcherCache.decisions !== decisions || matcherCache.ownership !== ownership || Date.now() >= matcherCache.matcher.expiresAt) {
+      matcherCache = { snapshot, decisions, ownership, matcher: BCCore.createMatcher(snapshot, decisions, ownership) };
+    }
+    return matcherCache.matcher;
+  }
+  function applyFilter(checkExpiry = true) {
+    // Expired page observations still need a fresh classification.
+    if (checkExpiry && matcherCache && Date.now() >= matcherCache.matcher.expiresAt) { render(); return; }
+    for (const { card } of renderedEntries) {
+      card.classList.toggle("bcc-hidden", filter !== "all" && renderedCards.get(card).status !== filter);
+      if (state.user && !card.classList.contains("bcc-hidden")) loadArtwork(card);
+    }
+    for (const [name, node] of Object.entries(buttons)) node.setAttribute("aria-pressed", String(filter === name));
+  }
   function renderPricing() {
     priceButton.disabled = pricing || busy || !state.snapshot?.complete || !missingReleases.length;
     priceButton.textContent = `${priceAttempted ? "Refresh missing prices" : "Price missing releases"} (${missingReleases.length})`;
@@ -206,22 +229,29 @@
   function render() {
     observer.disconnect();
     const entries = releases();
+    const matcher = collectionMatcher();
     const missing = new Map();
     const counts = { all: entries.length, missing: 0, probable: 0, owned: 0, unavailable: 0, unchecked: 0 };
     for (const { card, release } of entries) {
-      const result = BCCore.match(release, state.snapshot, state.decisions, state.ownership);
+      const result = matcher.match(release);
       const ownershipCheck = ownershipChecks.get(release.url);
       // A title-only label candidate needs artist verification before declaring it missing.
-      const needsMetadata = !release.artist && (state.snapshot?.items || []).some(i => i.type === release.type && BCCore.normalize(i.title) === BCCore.normalize(release.title));
+      const needsMetadata = matcher.needsMetadata(release);
       if (needsMetadata && result.status === "missing") result.status = "unchecked";
       if (result.status !== "owned" && (ownershipCheck?.checking || ownershipCheck?.error || ownershipCheck?.unknown)) result.status = "unchecked";
       if (result.status === "missing") missing.set(release.url, release);
       counts[result.status]++;
-      card.classList.toggle("bcc-hidden", filter !== "all" && result.status !== filter);
       card.classList.toggle("bcc-art-owned", result.status === "owned");
       card.classList.toggle("bcc-art-probable", result.status === "probable");
-      if (state.user && !card.classList.contains("bcc-hidden")) loadArtwork(card);
-      card.querySelector(":scope > .bcc-status")?.remove();
+      const reviewed = matcher.reviewed(release);
+      const candidates = [...new Map([...result.candidates, ...reviewed].map(i => [i.url, i])).values()];
+      const offer = prices.get(release.url)?.offer;
+      const signature = JSON.stringify([release, result, ownershipCheck, needsMetadata, failedMetadata.has(release.url), state.user?.fanId, offer, candidates.map(candidate => [candidate, state.decisions[BCCore.pair(release, candidate)]])]);
+      const previous = renderedCards.get(card);
+      if (previous?.signature === signature && previous.badge.parentElement === card) continue;
+      const oldBadge = card.querySelector(":scope > .bcc-status");
+      const expanded = oldBadge?.querySelector("details")?.open || false;
+      oldBadge?.remove();
       const badge = el("div", `bcc-status bcc-${result.status}`);
       const labels = { owned: result.reason === "page" ? "✓ Owned · verified by Bandcamp" : result.reason === "confirmed" ? "✓ Owned · confirmed equivalent" : "✓ Owned", probable: "≈ Probably owned · review", missing: "○ Not found in cached collection", unavailable: "— Unavailable on this storefront", unchecked: ownershipCheck?.checking ? "? Checking with Bandcamp…" : ownershipCheck?.error || ownershipCheck?.unknown || result.pageStatus ? "? Ownership unchecked" : needsMetadata ? "? Artist match unchecked" : "? Collection unchecked" };
       badge.append(el("strong", "", labels[result.status]));
@@ -233,10 +263,9 @@
         link.rel = "noopener noreferrer";
         badge.append(link);
       }
-      const reviewed = (state.snapshot?.items || []).filter(i => state.decisions[BCCore.pair(release, i)]);
-      const candidates = [...new Map([...result.candidates, ...reviewed].map(i => [i.url, i])).values()];
       if (candidates.length) {
         const details = el("details");
+        details.open = expanded;
         details.append(el("summary", "", result.status === "probable" ? "Review your copies" : "Match details"));
         for (const candidate of candidates) {
           const row = el("div", "bcc-candidate");
@@ -263,14 +292,15 @@
         badge.append(verify);
         if ((ownershipCheck?.error || ownershipCheck?.message) && ownershipCheck.message !== result.pageStatus?.message) badge.append(el("div", "bcc-ownership-note", ownershipCheck.error || ownershipCheck.message));
       }
-      const offer = prices.get(release.url)?.offer;
       if (result.status === "missing" && offer) badge.append(el("div", "bcc-release-price", `Digital: from ${money(offer.price, offer.currency)}${offer.price === 0 && offer.paidPrice != null ? ` · Paid minimum ${money(offer.paidPrice, offer.currency)}` : ""}`));
       card.append(badge);
+      renderedCards.set(card, { signature, status: result.status, badge });
     }
+    renderedEntries = entries;
+    applyFilter(false);
     summary.textContent = `${counts.owned} / ${counts.all} owned · ${counts.probable} probable · ${counts.missing} missing${counts.unavailable ? ` · ${counts.unavailable} unavailable` : ""}${counts.unchecked ? ` · ${counts.unchecked} unchecked` : ""}`;
     for (const [name, node] of Object.entries(buttons)) {
       node.textContent = `${({ all: "All", missing: "Missing", probable: "Review", owned: "Owned", unavailable: "Unavailable", unchecked: "Unchecked" })[name]} (${counts[name]})`;
-      node.setAttribute("aria-pressed", String(filter === name));
     }
     refreshButton.disabled = busy;
     missingReleases = [...missing.values()];
@@ -294,15 +324,21 @@
   async function resolveArtists() {
     if (resolving || !state.snapshot) return;
     resolving = true;
+    let changed = false, lastRender = Date.now();
     try {
       for (const { release } of releases()) {
         if (release.artist || metadata.has(release.url) || failedMetadata.has(release.url)) continue;
-        if (!state.snapshot.items.some(i => i.type === release.type && BCCore.normalize(i.title) === BCCore.normalize(release.title))) continue;
+        if (!collectionMatcher().needsMetadata(release)) continue;
         const result = await send({ type: "metadata", url: release.url });
         if (result.error) failedMetadata.add(release.url); else metadata.set(release.url, result);
-        render();
+        changed = true;
+        if (Date.now() - lastRender >= 100) {
+          render();
+          changed = false;
+          lastRender = Date.now();
+        }
       }
-    } finally { resolving = false; }
+    } finally { resolving = false; if (changed) render(); }
   }
   async function refresh(force = false) {
     if (busy) return;
@@ -343,9 +379,10 @@
       return;
     }
     const fanId = state.user?.fanId;
-    if (fanId && changes[`decisions:${fanId}`]) state.decisions = changes[`decisions:${fanId}`].newValue || {};
-    if (fanId && changes[`collection:${fanId}`]) state.snapshot = changes[`collection:${fanId}`].newValue || null;
-    if (fanId && changes[`ownership:${fanId}`]) state.ownership = changes[`ownership:${fanId}`].newValue || {};
+    if (!fanId || !["decisions", "collection", "ownership"].some(kind => changes[`${kind}:${fanId}`])) return;
+    if (changes[`decisions:${fanId}`]) state.decisions = changes[`decisions:${fanId}`].newValue || {};
+    if (changes[`collection:${fanId}`]) state.snapshot = changes[`collection:${fanId}`].newValue || null;
+    if (changes[`ownership:${fanId}`]) state.ownership = changes[`ownership:${fanId}`].newValue || {};
     render();
   });
   let lastFocus = Date.now();

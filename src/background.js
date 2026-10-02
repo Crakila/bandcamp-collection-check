@@ -1,5 +1,6 @@
 "use strict";
 const TTL = 6 * 60 * 60 * 1000;
+const OFFER_TTL = 10 * 60 * 1000;
 let queue = Promise.resolve();
 let epoch = 0;
 let progress = "";
@@ -97,6 +98,19 @@ async function state(force = false, token = epoch) {
   if (token !== epoch) throw new Error("Collection refresh cancelled.");
   return { user, snapshot, decisions: stored[`decisions:${user.fanId}`] || {}, ownership: BCCore.freshOwnership(stored[`ownership:${user.fanId}`] || {}), error };
 }
+function releaseUrl(value) {
+  const url = BCCore.canonical(value);
+  if (!url) throw new Error("Invalid release URL.");
+  return url;
+}
+async function cachedOffer(cache, key, force, limit, load) {
+  const cached = cache.get(key);
+  if (!force && cached && Date.now() - cached.updatedAt < OFFER_TTL) return { offer: cached.offer };
+  const offer = await load();
+  cache.set(key, { offer, updatedAt: Date.now() });
+  if (cache.size > limit) cache.delete(cache.keys().next().value);
+  return { offer };
+}
 async function handle(message, sender, token = epoch) {
   if (sender.tab && (sender.tab.incognito || (sender.tab.cookieStoreId && sender.tab.cookieStoreId !== "firefox-default"))) throw new Error("Use a regular, non-container tab for collection checks.");
   if (!["consent-state", "open-privacy", "set-consent", "clear-data", "clear-cache", "badge", "progress"].includes(message.type)) {
@@ -133,8 +147,7 @@ async function handle(message, sender, token = epoch) {
       const token = epoch;
       const user = await account();
       if (user.fanId !== message.fanId) throw new Error("Account changed. Refresh before checking ownership.");
-      const url = BCCore.canonical(message.url);
-      if (!url) throw new Error("Invalid release URL.");
+      const url = releaseUrl(message.url);
       const evidence = BCPage.ownershipEvidence(await documentAt(url), url);
       if (!evidence || evidence.fanId !== user.fanId) throw new Error("Bandcamp did not provide ownership data for this account. Open the release page and retry.");
       if ((message.id && String(message.id) !== evidence.release.id) || (message.releaseType && message.releaseType !== evidence.release.type)) throw new Error("Bandcamp returned a different release. Refresh the page and retry.");
@@ -182,29 +195,16 @@ async function handle(message, sender, token = epoch) {
       return {};
     }
     case "digital-price": {
-      const url = BCCore.canonical(message.url);
-      if (!url) throw new Error("Invalid release URL.");
-      const cached = digitalPrices.get(url);
-      if (!message.force && cached && Date.now() - cached.updatedAt < 10 * 60 * 1000) return { offer: cached.offer };
-      const offer = BCPage.digitalPrice(await documentAt(url), url);
-      digitalPrices.set(url, { offer, updatedAt: Date.now() });
-      if (digitalPrices.size > 1000) digitalPrices.delete(digitalPrices.keys().next().value);
-      return { offer };
+      const url = releaseUrl(message.url);
+      return cachedOffer(digitalPrices, url, message.force, 1000, async () => BCPage.digitalPrice(await documentAt(url), url));
     }
     case "discography": {
-      const url = BCCore.canonical(message.url);
-      if (!url) throw new Error("Invalid release URL.");
+      const url = releaseUrl(message.url);
       const cacheKey = JSON.stringify([url, message.bandId]);
-      const cached = discographyOffers.get(cacheKey);
-      if (!message.force && cached && Date.now() - cached.updatedAt < 10 * 60 * 1000) return { offer: cached.offer };
-      const offer = BCPage.discography(await documentAt(url), url, message.bandId);
-      discographyOffers.set(cacheKey, { offer, updatedAt: Date.now() });
-      if (discographyOffers.size > 100) discographyOffers.delete(discographyOffers.keys().next().value);
-      return { offer };
+      return cachedOffer(discographyOffers, cacheKey, message.force, 100, async () => BCPage.discography(await documentAt(url), url, message.bandId));
     }
     case "metadata": {
-      const url = BCCore.canonical(message.url);
-      if (!url) throw new Error("Invalid release URL.");
+      const url = releaseUrl(message.url);
       if (releaseMetadata.has(url)) return releaseMetadata.get(url);
       const doc = await documentAt(url);
       const tralbum = BCPage.jsonAttribute(doc, "[data-tralbum]", "data-tralbum");
