@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Privacy & access — Bandcamp Collection Check</title><link rel="stylesheet" href="consent.css"></head>
+<body><main>
+  <h1>Bandcamp Collection Check</h1>
+  <h2>Privacy & access</h2>
+  <p>This add-on uses your existing Bandcamp session to check your collection, ownership and release prices. It sends Bandcamp the account identifiers, release URLs and pagination information needed for those requests. Firefox sends your existing session cookies; artwork uses Bandcamp’s usual image hosts.</p>
+  <p>Your username/fan ID, release metadata, cache timestamps, ownership/availability observations and review decisions stay in this browser. The add-on does not save passwords, session cookies or payment details.</p>
+  <p><strong>No developer server, analytics, advertising or sale of your data.</strong> Your collection is not uploaded to GitHub or code.pf.ie.</p>
+  <p>Enabling access allows these Bandcamp requests, including automatic collection refreshes while browsing. Keeping access disabled stops the add-on’s collection, ownership and price checks. Private and container tabs are not supported.</p>
+  <p id="status" role="status">Checking your access settings…</p>
+  <div class="actions"><button id="enable" type="button">Enable Bandcamp access</button><button id="pause" type="button">Keep access disabled</button><button id="delete" type="button">Delete saved data</button></div>
+  <p class="note">Deleting saved data removes collection caches, page observations and review decisions, while keeping your access preference. Uninstalling removes all local storage.</p>
+  <p class="note">After enabling access, return to Bandcamp and reload your tab. For support and contributions, visit <a href="https://github.com/Crakila/bandcamp-collection-check/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>. Only post information you want to share publicly.</p>
+</main><script src="consent-page.js"></script></body></html>

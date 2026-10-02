@@ -1,0 +1,31 @@
+.bcc-panel { box-sizing: border-box; margin: 0 0 24px; padding: 16px; border: 1px solid #cadde3; border-radius: 8px; background: #f5fafb; color: #19333c; font: 14px/1.5 system-ui, sans-serif; clear: both; }
+.bcc-panel p { margin: 6px 0; }
+.bcc-panel .bcc-info { font-size: 12px; color: #465b62; overflow-wrap: anywhere; }
+.bcc-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.bcc-panel button, .bcc-status button, .bcc-panel .bcc-discography-buy { border: 1px solid #a4bcc4; border-radius: 5px; padding: 6px 9px; background: white; color: #19333c; cursor: pointer; font: inherit; }
+.bcc-panel button[aria-pressed="true"] { color: white; background: #16738a; border-color: #16738a; }
+.bcc-panel button:disabled, .bcc-status button:disabled { opacity: .6; cursor: wait; }
+.bcc-panel button:focus-visible, .bcc-status button:focus-visible, .bcc-panel .bcc-discography-buy:focus-visible { outline: 2px solid #16738a; outline-offset: 2px; }
+.bcc-discography { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bcc-discography[hidden] { display: none; }
+.bcc-panel .bcc-discography-buy { display: inline-block; text-decoration: none; color: white; background: #16738a; border-color: #16738a; }
+.bcc-panel .bcc-discography-buy:hover { background: #105c70; }
+.bcc-pricing { margin-top: 12px; padding-top: 12px; border-top: 1px solid #cadde3; }
+.bcc-pricing button { margin-right: 6px; }
+.bcc-pricing button[hidden] { display: none; }
+.bcc-release-price { margin-top: 5px; }
+#music-grid > .bcc-hidden { display: none !important; }
+#music-grid > .bcc-art-owned > a > .art { background-color: #d7efdd; box-shadow: 0 0 0 6px #d7efdd; border-radius: 2px; }
+#music-grid > .bcc-art-probable > a > .art { background-color: #ffe2a3; box-shadow: 0 0 0 6px #ffe2a3; border-radius: 2px; }
+#music-grid .art img.bcc-art-loaded { display: block !important; opacity: 1 !important; visibility: visible !important; }
+#music-grid .bcc-status { box-sizing: border-box; margin: 8px 0 16px; padding: 7px 8px; border-radius: 5px; color: #25363b; background: #edf1f2; font: 12px/1.5 system-ui, sans-serif; text-align: left; overflow-wrap: anywhere; }
+#music-grid .bcc-owned { background: #e7f5ec; color: #185932; }
+#music-grid .bcc-missing { background: transparent; color: #853631; }
+#music-grid .bcc-unavailable { background: transparent; color: #56646b; }
+#music-grid .bcc-linked-release { display: block; margin-top: 5px; color: #12667e; text-decoration: underline; }
+#music-grid .bcc-probable { background: #fff3d9; color: #755212; }
+#music-grid .bcc-status summary { cursor: pointer; margin-top: 4px; }
+#music-grid .bcc-candidate { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+#music-grid .bcc-candidate a { display: block; width: 100%; color: #12667e; text-decoration: underline; }
+#music-grid .bcc-candidate span { width: 100%; }
+#music-grid .bcc-status button { padding: 3px 5px; font-size: 11px; }

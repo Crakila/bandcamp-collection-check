@@ -1,0 +1,14 @@
+{
+  "manifest_version": 2,
+  "name": "Bandcamp Collection Check",
+  "version": "0.4.0",
+  "author": "Crakila",
+  "homepage_url": "https://github.com/Crakila/bandcamp-collection-check",
+  "description": "Find missing releases and review artist/label matches against your Bandcamp collection.",
+  "browser_specific_settings": { "gecko": { "id": "bandcamp-collection-check@pf.ie", "strict_min_version": "115.0", "data_collection_permissions": { "required": ["personallyIdentifyingInfo", "authenticationInfo", "browsingActivity", "websiteContent"] } } },
+  "permissions": ["storage", "https://bandcamp.com/*", "https://*.bandcamp.com/*"],
+  "background": { "scripts": ["src/core.js", "src/page-data.js", "src/consent.js", "src/background.js"] },
+  "content_scripts": [{ "matches": ["https://bandcamp.com/*", "https://*.bandcamp.com/*"], "js": ["src/core.js", "src/page-data.js", "src/content.js"], "css": ["src/content.css"], "run_at": "document_idle" }],
+  "browser_action": { "default_title": "Bandcamp Collection Check", "default_icon": "icons/collection.svg", "default_popup": "popup/popup.html" },
+  "icons": { "48": "icons/collection.svg", "96": "icons/collection.svg" }
+}

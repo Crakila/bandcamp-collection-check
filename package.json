@@ -1,0 +1,14 @@
+{
+  "name": "bandcamp-collection-check",
+  "version": "0.4.0",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/Crakila/bandcamp-collection-check.git" },
+  "bugs": { "url": "https://github.com/Crakila/bandcamp-collection-check/issues" },
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "lint": "web-ext lint --source-dir . --ignore-files 'tests/**' 'node_modules/**' 'package*.json' 'README.md' 'DEVELOPMENT.md' 'PRIVACY.md' '.github/**' 'artifacts/**'",
+    "build": "web-ext build --source-dir . --artifacts-dir artifacts --overwrite-dest --ignore-files 'tests/**' 'node_modules/**' 'package*.json' 'README.md' 'DEVELOPMENT.md' 'PRIVACY.md' '.github/**' 'artifacts/**'"
+  },
+  "devDependencies": { "jsdom": "^26.1.0", "web-ext": "^10.7.0" }
+}
