@@ -1,4 +1,6 @@
 # Bandcamp Collection Check
+[![Static Badge](https://img.shields.io/badge/Download%20Now-Firefox?style=flat&logo=firefoxbrowser&label=Firefox)](https://addons.mozilla.org/en-GB/firefox/addon/bandcamp-collection-check/)
+ | ![Mozilla Add-on Users](https://img.shields.io/amo/users/bandcamp-collection-check) | ![Mozilla Add-on Downloads](https://img.shields.io/amo/dw/bandcamp-collection-check)
 
 A desktop Firefox add-on that shows which releases you own while browsing Bandcamp artist and label music pages.
 
