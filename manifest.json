@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Bandcamp Collection Check",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "author": "Crakila",
   "homepage_url": "https://github.com/Crakila/bandcamp-collection-check",
   "description": "Find missing releases and review artist/label matches against your Bandcamp collection.",

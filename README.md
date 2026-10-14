@@ -7,6 +7,7 @@ A desktop Firefox add-on that shows which releases you own while browsing Bandca
 ## Features
 
 - **Owned:** green artwork backing for releases in your collection.
+- Prominent green **You own this** indicator beneath the title on album and track pages.
 - **Review:** amber backing for probable matches from another artist or label storefront.
 - **Missing, Unavailable and Unchecked:** keep purchasable gaps separate from unavailable releases and uncertain results.
 - Filter the music grid, confirm cross-label matches, and check ownership directly with Bandcamp.

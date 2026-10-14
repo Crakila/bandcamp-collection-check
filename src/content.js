@@ -1,5 +1,24 @@
 (function () {
   "use strict";
+  // Move the native control intact so its link and purchase-state rules survive.
+  const nameSection = document.querySelector("#name-section");
+  const collectItem = document.querySelector("#collect-item");
+  if (nameSection && collectItem) {
+    const originalPosition = document.createComment("bcc-collection-position");
+    collectItem.before(originalPosition);
+    const ownershipSlot = document.createElement("ul");
+    ownershipSlot.className = "bcc-page-ownership";
+    ownershipSlot.hidden = true;
+    nameSection.append(ownershipSlot);
+    function positionOwnership() {
+      const purchased = collectItem.classList.contains("purchased");
+      if (purchased && collectItem.parentElement !== ownershipSlot) ownershipSlot.append(collectItem);
+      if (!purchased && collectItem.parentElement === ownershipSlot) originalPosition.after(collectItem);
+      ownershipSlot.hidden = !purchased;
+    }
+    positionOwnership();
+    new MutationObserver(positionOwnership).observe(collectItem, { attributes: true, attributeFilter: ["class"] });
+  }
   // Album/track visits are useful even without a music grid: a verified page
   // purchase can fill gaps in the collection listing; an empty catalogue page
   // can also establish that an unmatched entry is unavailable at this store.

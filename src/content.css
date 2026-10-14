@@ -1,3 +1,12 @@
+/* Preserve Bandcamp's display/visibility rules for the signed-in purchase state. */
+#name-section .bcc-page-ownership { list-style: none; margin: 14px 0 0; padding: 0; }
+#name-section .bcc-page-ownership[hidden] { display: none; }
+#name-section .bcc-page-ownership #collect-item { float: none; margin: 0; padding: 0; list-style: none; }
+#name-section .bcc-page-ownership #collect-item.purchased #purchased-msg { display: inline-block; }
+#collect-item #purchased-msg { box-sizing: border-box; max-width: 100%; padding: 10px 14px; border: 1px solid #86b99a; border-left: 4px solid #237343; border-radius: 6px; background: #e7f5ec; color: #185932; font: 700 15px/1.5 system-ui, sans-serif; }
+#collect-item #purchased-msg a { color: #185932; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+#collect-item #purchased-msg a:hover { color: #103e23; }
+#collect-item #purchased-msg a:focus-visible { outline: 2px solid #237343; outline-offset: 3px; }
 .bcc-panel { box-sizing: border-box; margin: 0 0 24px; padding: 16px; border: 1px solid #cadde3; border-radius: 8px; background: #f5fafb; color: #19333c; font: 14px/1.5 system-ui, sans-serif; clear: both; }
 .bcc-panel p { margin: 6px 0; }
 .bcc-panel .bcc-info { font-size: 12px; color: #465b62; overflow-wrap: anywhere; }

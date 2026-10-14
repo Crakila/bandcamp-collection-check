@@ -175,6 +175,33 @@ test("visiting an owned release page reports ownership even though there is no m
   dom.window.close();
 });
 const wait = () => new Promise(resolve => setTimeout(resolve, 20));
+test("native ownership control moves to the title and returns when purchase state changes", async () => {
+  const dom = environment(`<div id="name-section"><h2>Album</h2></div><ul id="original"><li id="collect-item" class="wishlist"><span id="purchased-msg"><a href="https://bandcamp.com/tester">You own this</a></span></li></ul>`);
+  dom.window.browser = { storage: { onChanged: { addListener() {} } }, runtime: { sendMessage: async () => ({}) } };
+  const doc = dom.window.document;
+  const item = doc.querySelector("#collect-item"), link = item.querySelector("a");
+  let clicks = 0;
+  link.addEventListener("click", event => { event.preventDefault(); clicks++; });
+  dom.window.eval(source("content.js"));
+  const slot = doc.querySelector(".bcc-page-ownership");
+  assert.equal(slot.hidden, true);
+  assert.equal(item.parentElement.id, "original");
+  item.className = "purchased";
+  await wait();
+  assert.equal(slot.hidden, false);
+  assert.equal(item.parentElement, slot);
+  assert.equal(slot.parentElement.id, "name-section");
+  assert.equal(doc.querySelectorAll("#purchased-msg").length, 1);
+  assert.equal(item.querySelector("a"), link);
+  link.click();
+  assert.equal(clicks, 1);
+  assert.equal(link.href, "https://bandcamp.com/tester");
+  item.className = "wishlisted";
+  await wait();
+  assert.equal(slot.hidden, true);
+  assert.equal(item.parentElement.id, "original");
+  dom.window.close();
+});
 test("checking Night Love corrects its badge, filters, green backing and missing-price selection", async () => {
   const dom = environment(`<script data-band='{"name":"Sunset Network"}'></script><ol id="music-grid"><li class="music-grid-item" data-item-id="album-1078771401"><a href="/album/night-love"><div class="art"></div><p class="title">Night Love</p></a></li></ol>`, "https://sunset-network.bandcamp.com/music");
   let storageListener;
