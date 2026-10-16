@@ -95,18 +95,18 @@
     return result || {};
   }
   function releases() {
-    return [...grid.querySelectorAll(":scope > li.music-grid-item")].map(card => {
+    return [...grid.querySelectorAll(":scope > li.music-grid-item")].flatMap(card => {
       const anchor = card.querySelector("a[href]");
       const url = BCCore.canonical(anchor?.href);
       const typed = /^(album|track)-(\d+)$/.exec(card.dataset.itemId || "");
       const titleNode = card.querySelector(".title");
       // Label titles may contain a separate artist subtitle; don't include it in the title.
-      const title = titleNode ? [...titleNode.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(" ").trim() : "";
+      const title = titleNode ? [...titleNode.childNodes].flatMap(n => n.nodeType === Node.TEXT_NODE ? [n.textContent] : []).join(" ").trim() : "";
       const subtitle = card.querySelector(".artist, .artist-override");
       const release = { url, type: typed?.[1] || (url.includes("/track/") ? "track" : "album"), id: typed?.[2] || "", title, artist: subtitle?.textContent.trim() || (band.is_label ? "" : band.name || "") };
       Object.assign(release, metadata.get(url) || {});
-      return { card, release };
-    }).filter(({ release }) => release.url);
+      return release.url ? [{ card, release }] : [];
+    });
   }
   function loadArtwork(card) {
     for (const image of card.querySelectorAll(".art img[data-original]")) {
@@ -179,6 +179,8 @@
     checkedPrices = 0;
     priceAttempted = true;
     renderPricing();
+    // Keep this scan's release list stable while awaiting background responses.
+    // oxlint-disable-next-line unicorn/no-useless-spread
     for (const release of [...missingReleases]) {
       let result;
       try { result = await send({ type: "digital-price", url: release.url, force }); }
@@ -216,7 +218,7 @@
       link.rel = "noopener noreferrer";
       discography.append(link, el("span", "bcc-info", `${offer.count == null ? "Full digital discography" : `${offer.count} releases`} · Full bundle, including releases you already own`));
       discography.hidden = false;
-    } catch (error) {
+    } catch {
       discography.replaceChildren(el("span", "bcc-info", "Discography price could not be checked."), button("Retry", () => checkDiscography(true)));
       discography.hidden = false;
     } finally { checkingDiscography = false; }

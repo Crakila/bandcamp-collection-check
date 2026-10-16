@@ -52,6 +52,18 @@ npm run lint
 npm run build
 ```
 
+`npm run lint` runs JavaScript checks with Oxlint and the vendored
+[anti-slop rules](https://github.com/dmmulroy/anti-slop), then validates the Firefox
+extension with `web-ext lint`. CI runs both through the same command. Use
+`npm run lint:js` or `npm run lint:extension` to run either check separately.
+
+The lint policy is in `.oxlintrc.json`. Runtime `typeof` checks remain allowed for
+external data validation; the upstream naming and spacing rules are not enabled.
+All other generic anti-slop rules are errors. The plugin, its licences, pinned
+upstream revision, and update notes are in `tools/oxlint/anti-slop/`. Oxlint and
+`@oxlint/plugins` use matching exact versions. Lint tooling is excluded from the
+extension archive.
+
 The archive is written to `artifacts/`. For permanent Firefox installation, submit/sign the extension through Mozilla Add-ons (an unlisted distribution is possible). Waterfox’s acceptance of unsigned archives depends on its build/settings; temporary loading above is the development route. This repository does not include a signed extension.
 
 ## Verification
