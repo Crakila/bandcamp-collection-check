@@ -38,3 +38,11 @@
 #music-grid .bcc-candidate a { display: block; width: 100%; color: #12667e; text-decoration: underline; }
 #music-grid .bcc-candidate span { width: 100%; }
 #music-grid .bcc-status button { padding: 3px 5px; font-size: 11px; }
+
+/* Discover cards are populated and replaced by Bandcamp as filters change. */
+.results-grid-item.bcc-hidden { display: none !important; }
+.results-grid-item.bcc-art-owned { outline: 4px solid #86b99a; border-radius: 4px; }
+.results-grid-item.bcc-art-probable { outline: 4px solid #e5bd65; border-radius: 4px; }
+.results-grid-item .bcc-status { padding: 8px; margin-top: 8px; background: #edf1f2; color: #25363b; font: 12px/1.5 system-ui, sans-serif; }
+.results-grid-item .bcc-owned { background: #e7f5ec; color: #185932; }
+.results-grid-item .bcc-probable { background: #fff3d9; color: #755212; }

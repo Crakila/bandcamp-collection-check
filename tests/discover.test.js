@@ -1,0 +1,25 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { JSDOM } = require("jsdom");
+test("Discover annotates albums, checks ownership and handles replaced results", async () => {
+  const card = slug => `<div class="results-grid-item"><a href="https://artist.bandcamp.com/album/${slug}"><span class="title">${slug}</span></a><span class="attribution">Artist</span></div>`;
+  const dom = new JSDOM(`<main><div class="results-grid">${card("owned")}${card("missing")}<div class="results-grid-item"><a href="https://artist.bandcamp.com/track/single">Single</a></div></div></main>`, { url: "https://bandcamp.com/discover/citypop/digital", runScripts: "outside-only" });
+  const messages = [];
+  const state = { user: { fanId: 7, username: "tester" }, decisions: {}, snapshot: { complete: true, updatedAt: Date.now(), items: [{ type: "album", id: "1", url: "https://artist.bandcamp.com/album/owned", title: "owned", artist: "Artist" }] } };
+  dom.window.browser = { storage: { onChanged: { addListener() {} } }, runtime: { onMessage: { addListener() {} }, sendMessage: async message => { messages.push(message); return message.type === "state" ? state : message.type === "check-ownership" ? { fanId: 7, owned: false } : {}; } } };
+  for (const file of ["core.js", "page-data.js", "content.js"]) dom.window.eval(fs.readFileSync(path.join(__dirname, "..", "src", file), "utf8"));
+  await new Promise(resolve => setTimeout(resolve, 30));
+  const doc = dom.window.document;
+  assert.equal(doc.querySelectorAll(".bcc-status").length, 2);
+  assert.equal(doc.querySelectorAll(".bcc-owned").length, 1);
+  [...doc.querySelectorAll("button")].find(node => node.textContent === "Check ownership").click();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(messages.find(message => message.type === "check-ownership").url, "https://artist.bandcamp.com/album/missing");
+  doc.querySelector(".results-grid").innerHTML = card("replacement");
+  await new Promise(resolve => setTimeout(resolve, 150));
+  assert.equal(doc.querySelectorAll(".bcc-status").length, 1);
+  assert.equal(messages.some(message => message.type === "discography" || message.type === "digital-price"), false);
+  dom.window.close();
+});

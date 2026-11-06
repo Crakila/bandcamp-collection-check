@@ -26,7 +26,13 @@
     if (!band || (expectedBandId != null && String(band.id) !== String(expectedBandId))) return null;
     if (!bundle?.enabled || data.show_buy_full_disco === false || !/^\d+$/.test(String(bundle.bundle_id))) return null;
     if (bundle.price == null || String(bundle.price).trim() === "") return null;
-    const price = Number(bundle.price);
+    let price = Number(bundle.price);
+    // Bandcamp caps the purchase price even when bundle metadata (and JSON-LD)
+    // still reports the higher discounted sum of individual releases.
+    const maximum = data.max_price;
+    if (maximum != null && String(maximum).trim() !== "" && Number.isFinite(Number(maximum)) && Number(maximum) > 0) {
+      price = Math.min(price, Number(maximum));
+    }
     // Release pages use a smaller data-band object than music grids. Their
     // selling currency is attached to Bandcamp's currency-data script instead.
     const currency = String(doc.querySelector("[data-band-currency]")?.getAttribute("data-band-currency") || band.currency || "").toUpperCase();

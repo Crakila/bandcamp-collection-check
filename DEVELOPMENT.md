@@ -120,3 +120,12 @@ Authenticated live requests and UI compatibility must be checked in your browser
 5. Open **Privacy & access**, pause Bandcamp access, and verify that refresh/pricing requests stop. **Delete saved data** removes collection, page observations and review decisions. Enable access again to resume.
 
 Permissions are limited to extension-local storage and Bandcamp hosts. Read-only collection endpoints and release-page metadata are used to provide the features. Review decisions are local. Network requests reuse the browser’s normal Bandcamp session; no passwords, session cookies or payment details are saved by the extension.
+
+## Version 0.4.2 release notes
+
+- Check album and EP ownership on Bandcamp Discover, including genre-filtered pages and dynamically loaded results.
+- Use collection filters and individual ownership checks on Discover cards.
+- Respect Bandcamp's maximum purchase price for digital discography offers, fixing Seikomart's JPY 140,000 bundle being shown as JPY 183,906.
+- Add regression coverage for Discover updates and capped discography prices.
+
+Validation: 43 automated tests pass; Oxlint passes; extension validation reports no errors and the two existing consent-key compatibility warnings. Discover's signed-in live UI still requires manual acceptance testing.

@@ -30,7 +30,8 @@
   }
   reportPageOwnership();
   browser.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes.bandcampConsent) reportPageOwnership(); });
-  const grid = document.querySelector("#music-grid");
+  const discover = location.hostname === "bandcamp.com" && /^\/discover(?:\/|$)/.test(location.pathname);
+  const grid = discover ? document.querySelector("main") || document.body : document.querySelector("#music-grid");
   if (!grid) return;
   const band = BCPage.jsonAttribute(document, "[data-band]", "data-band") || {};
   let state = { snapshot: null, decisions: {}, error: "" };
@@ -72,8 +73,8 @@
   const priceInfo = el("p", "bcc-info");
   priceInfo.setAttribute("role", "status");
   pricePanel.append(priceButton, stopButton, priceInfo);
-  panel.append(pricePanel);
-  grid.before(panel);
+  if (!discover) panel.append(pricePanel);
+  if (discover) grid.prepend(panel); else grid.before(panel);
   function el(tag, className = "", text = "") {
     const node = document.createElement(tag);
     node.className = className;
@@ -95,14 +96,15 @@
     return result || {};
   }
   function releases() {
-    return [...grid.querySelectorAll(":scope > li.music-grid-item")].flatMap(card => {
-      const anchor = card.querySelector("a[href]");
+    return [...grid.querySelectorAll(discover ? ".results-grid-item" : ":scope > li.music-grid-item")].flatMap(card => {
+      const anchor = card.querySelector(discover ? 'a[href*="/album/"], a[href*="/track/"]' : "a[href]");
       const url = BCCore.canonical(anchor?.href);
+      if (discover && (!url || !new URL(url).pathname.startsWith("/album/"))) return [];
       const typed = /^(album|track)-(\d+)$/.exec(card.dataset.itemId || "");
       const titleNode = card.querySelector(".title");
       // Label titles may contain a separate artist subtitle; don't include it in the title.
       const title = titleNode ? [...titleNode.childNodes].flatMap(n => n.nodeType === Node.TEXT_NODE ? [n.textContent] : []).join(" ").trim() : "";
-      const subtitle = card.querySelector(".artist, .artist-override");
+      const subtitle = card.querySelector(discover ? ".attribution, .artist" : ".artist, .artist-override");
       const release = { url, type: typed?.[1] || (url.includes("/track/") ? "track" : "album"), id: typed?.[2] || "", title, artist: subtitle?.textContent.trim() || (band.is_label ? "" : band.name || "") };
       Object.assign(release, metadata.get(url) || {});
       return release.url ? [{ card, release }] : [];
@@ -195,7 +197,7 @@
     if (run === priceRun) { pricing = false; render(); }
   }
   async function checkDiscography(force = false) {
-    if (checkingDiscography || (checkedDiscography && !force) || band.meets_buy_full_discography_criteria === false) return;
+    if (discover || checkingDiscography || (checkedDiscography && !force) || band.meets_buy_full_discography_criteria === false) return;
     const release = releases().find(({ release }) => new URL(release.url).origin === location.origin)?.release;
     if (!release) return;
     checkingDiscography = true;
@@ -381,7 +383,7 @@
     await resolveArtists();
   }
   const observer = new MutationObserver(records => {
-    if (!records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && !node.closest?.(".bcc-status")))) return;
+    if (!records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && !node.closest?.(".bcc-status, .bcc-panel")))) return;
     clearTimeout(timer);
     timer = setTimeout(() => {
       render();

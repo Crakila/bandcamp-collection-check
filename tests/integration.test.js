@@ -34,6 +34,19 @@ test("discography offer uses Bandcamp's discounted starting price and bundle pur
   for (const price of [null, "", "unavailable", -1]) assert.equal(parse(discographyHTML({ price })), null);
   dom.window.close();
 });
+test("discography prices respect Bandcamp's purchase cap without applying another discount", () => {
+  const dom = environment();
+  const parse = maximum => {
+    const data = { show_buy_full_disco: true, max_price: maximum, price: 980, buyfulldisco: { enabled: 1, bundle_id: 113136665, price: 183906, full_price: 204340, discount: 0.1, tralbum_count: 281 } };
+    const html = `<script data-band='{"id":9,"currency":"JPY"}'></script><div id="pagedata" data-blob='${JSON.stringify(data)}'></div>`;
+    return dom.window.BCPage.discography(new dom.window.DOMParser().parseFromString(html, "text/html"), "https://seikomart.bandcamp.com/album/future-funkadelic-vi", 9);
+  };
+  assert.equal(parse(140000).price, 140000);
+  assert.equal(parse(200000).price, 183906);
+  for (const maximum of [null, "", "invalid", -1, 0]) assert.equal(parse(maximum).price, 183906);
+  assert.equal(parse(140000).currency, "JPY");
+  dom.window.close();
+});
 test("discography lookup refreshes its price and does not offer a different seller's bundle", async () => {
   const dom = environment();
   let listener, calls = 0, price = 1, now = 100000000;
